@@ -1,4 +1,12 @@
-# Job Decode AI Backend
+Added the FastAPI backend with a FAISS-based RAG pipeline using Groq's Llama 3.3 70B model.
+
+Includes:
+- app.py – main FastAPI app
+- rag_chain.py – RAG logic and vector search
+- ingest.py – data ingestion script
+- requirements.txt – dependencies
+
+Note: requires a .env file with GROQ_API_KEY to run (not included, see .env.example).# Job Decode AI Backend
 
 This backend provides a FastAPI service for a RAG-powered career assistant.
 
