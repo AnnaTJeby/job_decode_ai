@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Decode AI Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 2rem; background: #f7f9fc; color: #222; }
+    .card { max-width: 800px; margin: auto; background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    textarea, input { width: 100%; padding: 0.8rem; margin-top: 0.5rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 8px; }
+    button { padding: 0.8rem 1rem; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    .result { white-space: pre-wrap; background: #f3f4f6; padding: 1rem; border-radius: 8px; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Job Decode AI Demo</h1>
+    <p>Paste a job description or use the sample text, then ask a question.</p>
+
+    <label for="jobText">Job Description</label>
+    <textarea id="jobText" rows="8">Software Engineer Job Description
+
+We are looking for a Software Engineer with 2+ years of experience in Python, FastAPI, and SQL. The candidate should be comfortable building REST APIs, writing unit tests, and working with Git and Docker. Responsibilities include developing backend services, integrating with databases, debugging production issues, and collaborating with product and frontend teams. Preferred qualifications include experience with cloud platforms such as Azure or AWS, CI/CD pipelines, and basic knowledge of machine learning concepts.</textarea>
+
+    <button onclick="loadJob()">Load Job Description</button>
+
+    <label for="question">Question</label>
+    <input id="question" placeholder="What skills are required for this role?" />
+    <button onclick="askQuestion()">Ask</button>
+
+    <div id="result" class="result">No response yet.</div>
+  </div>
+
+  <script>
+    const apiBase = 'http://127.0.0.1:8000';
+
+    async function loadJob() {
+      const text = document.getElementById('jobText').value;
+      const res = await fetch(apiBase + '/load', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw_text: text })
+      });
+      const data = await res.json();
+      document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function askQuestion() {
+      const question = document.getElementById('question').value;
+      const res = await fetch(apiBase + '/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+      });
+      const data = await res.json();
+      document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+    }
+  </script>
+</body>
+</html>

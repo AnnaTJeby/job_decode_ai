@@ -1,0 +1,3 @@
+Software Engineer Job Description
+
+We are looking for a Software Engineer with 2+ years of experience in Python, FastAPI, and SQL. The candidate should be comfortable building REST APIs, writing unit tests, and working with Git and Docker. Responsibilities include developing backend services, integrating with databases, debugging production issues, and collaborating with product and frontend teams. Preferred qualifications include experience with cloud platforms such as Azure or AWS, CI/CD pipelines, and basic knowledge of machine learning concepts.
