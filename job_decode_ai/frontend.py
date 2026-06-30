@@ -2,8 +2,11 @@ import os
 import gradio as gr
 import requests
 
-FASTAPI_URL = os.getenv("FASTAPI_URL", "http://127.0.0.1:8002")
+FASTAPI_URL = os.getenv("FASTAPI_URL", "http://127.0.0.1:8001")
 
+CUSTOM_CSS = """
+footer {display: none !important;}
+"""
 
 def _parse_api_response(response):
     try:
@@ -14,7 +17,14 @@ def _parse_api_response(response):
 
     if isinstance(data, dict):
         return data
+
     return {"status": "error", "message": str(data)}
+
+
+def _normalize_text(raw_text):
+    if not raw_text:
+        return None
+    return raw_text.replace("\r\n", "\n").replace("\r", "\n").strip() or None
 
 
 def load_job_description(raw_text, file_obj):
@@ -24,35 +34,59 @@ def load_job_description(raw_text, file_obj):
 
     payload = {
         "file_path": file_path,
-        "raw_text": (raw_text or "").strip() or None,
+        "raw_text": _normalize_text(raw_text),
         "temperature": 0.0,
     }
 
     try:
-        response = requests.post(f"{FASTAPI_URL}/load", json=payload, timeout=30)
+        response = requests.post(
+            f"{FASTAPI_URL}/load",
+            json=payload,
+            timeout=120
+        )
         data = _parse_api_response(response)
+
         if response.ok:
-            return data.get("message", data.get("status", str(data)))
+            if data.get("status") == "success":
+                return data.get("message", "Indexed successfully.")
+            return f"Error: {data.get('message', 'Unknown error')}"
+
         return f"Error: {data.get('message', data.get('detail', str(data)))}"
     except Exception as exc:
         return f"Error: {str(exc)}"
 
 
-def ask_question(message, history):
+def ask_question(message, history_text):
+    message = (message or "").strip()
+    history_text = history_text or ""
+
+    if not message:
+        return "", history_text
+
     payload = {"question": message}
 
     try:
-        response = requests.post(f"{FASTAPI_URL}/ask", json=payload, timeout=30)
+        response = requests.post(
+            f"{FASTAPI_URL}/ask",
+            json=payload,
+            timeout=120
+        )
         data = _parse_api_response(response)
         answer = data.get("answer", data.get("message", "No answer returned."))
     except Exception as exc:
         answer = f"Error: {str(exc)}"
 
-    history = history or []
-    history.append({"role": "user", "content": message})
-    history.append({"role": "assistant", "content": answer})
+    updated_history = history_text.strip()
+    if updated_history:
+        updated_history += "\n\n"
 
-    return "", history
+    updated_history += f"User: {message}\nAssistant: {answer}"
+    return "", updated_history
+
+
+def clear_chat():
+    return ""
+
 
 with gr.Blocks(title="JobDecode AI") as demo:
     gr.Markdown("# JobDecode AI")
@@ -60,14 +94,29 @@ with gr.Blocks(title="JobDecode AI") as demo:
 
     with gr.Row():
         with gr.Column():
-            raw_text = gr.Textbox(label="Paste Job Description", lines=12)
-            file_input = gr.File(label="Or Upload a PDF / TXT file", file_types=[".pdf", ".txt"])
+            raw_text = gr.Textbox(
+                label="Paste Job Description",
+                lines=14,
+                placeholder="Paste the job description here..."
+            )
+            file_input = gr.File(
+                label="Or Upload a PDF / TXT file",
+                file_types=[".pdf", ".txt"]
+            )
             load_button = gr.Button("Load / Index Job Description")
             load_status = gr.Textbox(label="Status", interactive=False)
 
         with gr.Column():
-            chatbot = gr.Chatbot(label="JobDecode Chat")
-            msg = gr.Textbox(label="Ask a question")
+            chat_history = gr.Textbox(
+                label="JobDecode Chat",
+                lines=20,
+                interactive=False,
+                placeholder="Conversation will appear here..."
+            )
+            msg = gr.Textbox(
+                label="Ask a question",
+                placeholder="e.g. What skills are required?"
+            )
             send_btn = gr.Button("Send")
             clear_btn = gr.Button("Clear Chat")
 
@@ -79,16 +128,24 @@ with gr.Blocks(title="JobDecode AI") as demo:
 
     send_btn.click(
         fn=ask_question,
-        inputs=[msg, chatbot],
-        outputs=[msg, chatbot]
+        inputs=[msg, chat_history],
+        outputs=[msg, chat_history]
     )
 
     msg.submit(
         fn=ask_question,
-        inputs=[msg, chatbot],
-        outputs=[msg, chatbot]
+        inputs=[msg, chat_history],
+        outputs=[msg, chat_history]
     )
 
-    clear_btn.click(lambda: [], outputs=chatbot)
+    clear_btn.click(
+        fn=clear_chat,
+        outputs=chat_history
+    )
 
-demo.launch(server_name="127.0.0.1", server_port=7860, inbrowser=True)
+demo.launch(
+    server_name="127.0.0.1",
+    server_port=7861,
+    inbrowser=True,
+    css=CUSTOM_CSS
+)

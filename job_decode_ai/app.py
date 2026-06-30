@@ -1,18 +1,21 @@
 from typing import Optional
-from fastapi import FastAPI, HTTPException
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from rag_chain import answer_question, build_chain, reset_index
+from pydantic import BaseModel
+
+from rag_chain import build_chain, answer_question
+from ingest import reset_index
 
 app = FastAPI(
     title="JobDecode AI",
-    description="RAG-powered backend for analyzing job descriptions and answering career questions",
     version="1.0.0",
+    description="RAG-powered backend for analyzing job descriptions and answering career questions"
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://127.0.0.1:7861", "http://localhost:7861"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -20,43 +23,63 @@ app.add_middleware(
 
 
 class LoadRequest(BaseModel):
-    file_path: Optional[str] = Field(default=None, description="Path to a .pdf or .txt job description")
-    raw_text: Optional[str] = Field(default=None, description="Raw job description text")
-    temperature: float = Field(default=0.0, ge=0.0, le=1.0)
+    file_path: Optional[str] = None
+    raw_text: Optional[str] = None
+    temperature: float = 0.0
 
 
 class QueryRequest(BaseModel):
-    question: str = Field(..., min_length=1, description="Question about the uploaded job description")
+    question: str
 
 
 @app.get("/")
-def root() -> dict:
+def root():
     return {"message": "JobDecode AI backend is running", "status": "ok"}
 
 
 @app.get("/health")
-def health() -> dict:
+def health():
     return {"status": "ok", "service": "jobdecode-ai"}
 
 
 @app.post("/load")
-def load_input(request: LoadRequest) -> dict:
-    if not request.file_path and not request.raw_text:
-        raise HTTPException(status_code=400, detail="Provide either file_path or raw_text")
+def load_input(payload: LoadRequest):
+    try:
+        file_path = payload.file_path
+        raw_text = payload.raw_text
 
-    result = build_chain(
-        file_path=request.file_path,
-        raw_text=request.raw_text,
-        temperature=request.temperature,
-    )
-    return result
+        if raw_text is not None:
+            raw_text = raw_text.replace("\r\n", "\n").replace("\r", "\n").strip()
+
+        if not file_path and not raw_text:
+            return {
+                "status": "error",
+                "message": "Provide either pasted text or an uploaded file."
+            }
+
+        return build_chain(
+            file_path=file_path,
+            raw_text=raw_text,
+            temperature=payload.temperature
+        )
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
 
 
 @app.post("/ask")
-def ask_question_api(request: QueryRequest) -> dict:
-    return answer_question(request.question)
+def ask_question_api(payload: QueryRequest):
+    try:
+        return answer_question(payload.question)
+    except Exception as exc:
+        return {
+            "answer": f"Error: {str(exc)}",
+            "sources": []
+        }
 
 
 @app.post("/reset")
-def reset_backend() -> dict:
-    return reset_index()
+def reset_backend():
+    try:
+        return reset_index()
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
